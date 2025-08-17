@@ -18,7 +18,7 @@ async function startServer() {
 
   // Enable CORS for http://localhost:3000
   app.use(cors({
-    origin: ['http://localhost:3000','https://lostitemfinder.com']
+    origin: ['http://localhost:3000','https://lostitemfinder.com'],
     methods: ['GET', 'PUT', 'DELETE', 'PATCH'],
     // Optional: if you need to send cookies or auth headers
     credentials: true, 
@@ -55,4 +55,5 @@ async function startServer() {
 }
 
 startServer();
+
 
