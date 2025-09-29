@@ -21,7 +21,7 @@ async function startServer() {
 
   // CORS configuration
   app.use(cors({
-    origin: 'https://lostitemfinder.com',
+    origin: ['https://lostitemfinder.com', 'http://localhost:3000'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     credentials: true,
   }));
@@ -77,3 +77,4 @@ async function startServer() {
 
 
 startServer();
+
