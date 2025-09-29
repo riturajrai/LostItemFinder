@@ -113,48 +113,38 @@ router.post('/verify-signup-otp', async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+// LOGIN
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required' });
     }
-
     const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: 'Invalid credentials' });
-
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
     if (!user.isVerified) {
       return res.status(400).json({ message: 'Please verify your email first' });
     }
-
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
-
-    // ✅ sign JWT
-    const token = jwt.sign(
-      { id: user._id },
-      process.env.JWT_SECRET || 'your_jwt_secret_fallback',
-      { expiresIn: '1h' }
-    );
-
-    // ✅ set cookie for cross-site use
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'your_jwt_secret_fallback', { expiresIn: '1h' });
     res.cookie('token', token, {
       httpOnly: true,
-      secure: true,          // must be true with SameSite=None on HTTPS
-      sameSite: 'None',      // <-- allow cross-site
-      maxAge: 3600 * 1000    // 1 hour
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax', // Use 'lax' in development
+      maxAge: 3600 * 1000, // 1 hour
     });
-
-    res.status(200).json({
-      message: 'Login successful',
-      user: { id: user._id, name: user.name, email: user.email }
-    });
+    res.status(200).json({ message: 'Login successful', user: { id: user._id, name: user.name, email: user.email }, token });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
-
 // FORGOT PASSWORD
 router.post('/forgot-password', async (req, res) => {
   try {
