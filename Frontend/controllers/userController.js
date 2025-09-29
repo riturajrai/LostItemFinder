@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { sendOtpEmail, sendWelcomeEmail, sendResetPasswordOtpEmail } = require('../mailes/Maile');
 const User = require('../models/User');
+const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -13,7 +14,6 @@ const pendingSignups = new Map();
 router.post('/signup', async (req, res) => {
   try {
     const { name, email, password, confirmPassword } = req.body;
-
     // Validation
     if (!name || !email || !password || !confirmPassword) {
       return res.status(400).json({ message: 'All fields are required' });
@@ -46,7 +46,6 @@ router.post('/signup', async (req, res) => {
     // Generate OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const hashedPassword = await bcrypt.hash(password, 12);
-
     // Store pending signup
     pendingSignups.set(email, {
       name,
@@ -106,10 +105,8 @@ router.post('/verify-signup-otp', async (req, res) => {
       console.error('Failed to send welcome email:', emailError);
       // Continue despite email failure
     }
-
     // Clean up
     pendingSignups.delete(email);
-
     res.status(201).json({ message: 'User registered successfully' });
   } catch (err) {
     console.error('Verify OTP error:', err);
@@ -136,13 +133,18 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'your_jwt_secret_fallback', { expiresIn: '1h' });
-    res.status(200).json({ message: 'Login successful', token });
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax', // Use 'lax' in development
+      maxAge: 3600 * 1000, // 1 hour
+    });
+    res.status(200).json({ message: 'Login successful', user: { id: user._id, name: user.name, email: user.email } });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
-
 // FORGOT PASSWORD
 router.post('/forgot-password', async (req, res) => {
   try {
@@ -224,6 +226,21 @@ router.post('/reset-password', async (req, res) => {
     console.error('Reset password error:', err);
     res.status(500).json({ message: 'Server error' });
   }
+});
+
+// VERIFY TOKEN
+router.get('/verify-token', authMiddleware, (req, res) => {
+  res.json({ user: { id: req.user._id, name: req.user.name, email: req.user.email } });
+});
+// Logout
+router.post('/logout', (req, res) => {
+  console.log(`[${new Date().toISOString()}] Clearing token cookie`);
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+  });
+  res.status(200).json({ message: 'Logged out successfully' });
 });
 
 module.exports = router;
